@@ -93,6 +93,9 @@ body.locked{overflow:hidden;height:100vh}
 }
 .hero .top{margin-bottom:34px}
 .hero .top .label{color:var(--terra)}
+.verse.hero-verse{max-width:27em;margin:0 auto 24px;padding:0 8px;font-size:clamp(1.2rem,4.4vw,1.6rem);position:relative;z-index:2}
+.verse.hero-verse::before{display:none}
+.verse.hero-verse cite{margin-top:10px}
 .stage{--w:min(84vw,400px);position:relative;width:var(--w);z-index:2}
 .arch{
   position:relative;width:var(--w);aspect-ratio:1/1.5;
@@ -155,7 +158,7 @@ body.locked{overflow:hidden;height:100vh}
 /* entrée du héros */
 .hin{opacity:0}
 .started .hin{animation:fadeUp 1.2s cubic-bezier(.2,.7,.2,1) forwards}
-.started .a1{animation-delay:.6s}.started .a2{animation-delay:.9s}.started .a3{animation-delay:1.2s}.started .a4{animation-delay:1.5s}.started .a5{animation-delay:1.8s}
+.started .a0{animation-delay:.3s}.started .a1{animation-delay:.6s}.started .a2{animation-delay:.9s}.started .a3{animation-delay:1.2s}.started .a4{animation-delay:1.5s}.started .a5{animation-delay:1.8s}
 @keyframes fadeUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
 .arch{clip-path:inset(100% 0 0 0)}
 .started .arch{animation:rise 1.9s cubic-bezier(.65,0,.2,1) .15s forwards}
@@ -278,6 +281,23 @@ body.locked{overflow:hidden;height:100vh}
 .hash{position:relative;z-index:2}
 .foot .hero-flora{bottom:-10px;opacity:.9}
 
+/* Bouton musique */
+.music{
+  position:fixed;right:16px;bottom:16px;z-index:70;width:50px;height:50px;border-radius:50%;
+  border:1.5px solid rgba(233,213,166,.8);background:rgba(53,80,63,.92);color:var(--champagne);
+  display:grid;place-items:center;cursor:pointer;box-shadow:0 12px 26px -10px rgba(0,0,0,.55);
+  opacity:0;transform:scale(.7);pointer-events:none;
+  transition:opacity .8s ease,transform .8s cubic-bezier(.2,.7,.2,1),background .3s;
+}
+.music.show{opacity:1;transform:none;pointer-events:auto}
+.music:hover{background:var(--green)}
+.music .eq{display:flex;gap:3px;align-items:flex-end;height:18px}
+.music .eq i{width:3px;height:100%;background:currentColor;border-radius:2px;transform-origin:bottom;animation:eq 1.1s ease-in-out infinite}
+.music .eq i:nth-child(2){animation-delay:-.4s}.music .eq i:nth-child(3){animation-delay:-.8s}.music .eq i:nth-child(4){animation-delay:-.2s}
+.music.off .eq i{animation:none;transform:scaleY(.18)}
+.music.off::after{content:"";position:absolute;width:30px;height:2px;background:var(--champagne);transform:rotate(-45deg);border-radius:2px}
+@keyframes eq{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
+
 /* Toast */
 #toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,30px);opacity:0;z-index:80;background:var(--green);color:#fff;
   border-radius:14px;padding:13px 22px;max-width:90vw;text-align:center;font-size:1.1rem;transition:.4s ease;pointer-events:none}
@@ -310,6 +330,9 @@ body.locked{overflow:hidden;height:100vh}
 
 <!-- ====== HÉROS ====== -->
 <header class="hero" id="hero">
+  <p class="verse hero-verse hin a0">Ainsi, ils ne sont plus deux, mais une seule chair. Que l'homme donc ne sépare pas ce que Dieu a uni.
+    <cite>Mathieu 19 : 6</cite></p>
+
   <div class="top hin a1"><span class="label">Vous êtes invité(e) au mariage de</span></div>
 
   <div class="stage">
@@ -355,9 +378,7 @@ body.locked{overflow:hidden;height:100vh}
 <!-- ====== Verset + message ====== -->
 <section class="sec reveal">
   <div class="divider"><i></i><b></b><i></i></div>
-  <p class="verse">Ainsi, ils ne sont plus deux, mais une seule chair. Que l'homme donc ne sépare pas ce que Dieu a uni.
-    <cite>Mathieu 19 : 6</cite></p>
-  <p class="lead">Ils ont la joie de vous convier à la célébration de leur mariage, le <em>vendredi 13 novembre 2026</em>.</p>
+  <p class="lead" style="margin-top:22px">Ils ont la joie de vous convier à la célébration de leur mariage, le <em>vendredi 13 novembre 2026</em>.</p>
   <p class="dear" id="dear" hidden></p>
 </section>
 
@@ -454,11 +475,17 @@ body.locked{overflow:hidden;height:100vh}
 </footer>
 
 </div>
+<button id="musicBtn" class="music" type="button" aria-label="Couper la musique" aria-pressed="true">
+  <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+</button>
 <div id="toast" role="status"></div>
 
 <script>
 /* ============ À MODIFIER ============ */
 const RSVP_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfbXXrQfulAW-fBgYmtO_jvDhCtU_DG1nH6tJ8dd52ePMuUFw/viewform?usp=publish-editor";   // ex. https://forms.gle/xxxxxxxx
+// Musique : laissez vide pour la musique douce intégrée.
+// Pour votre propre morceau : mettez un fichier mp3 dans le même dossier (ex. musique.mp3) et écrivez son nom ici.
+const MUSIC_URL = "";
 /* ==================================== */
 
 const EVENT_UTC = Date.UTC(2026, 10, 13, 12, 0, 0); // 13 nov. 2026, 12h00 (Abidjan = UTC)
@@ -548,12 +575,105 @@ function tlProgress(){
 }
 addEventListener('scroll',tlProgress,{passive:true}); addEventListener('resize',tlProgress); tlProgress();
 
+/* --- Musique douce (synthétisée, aucun fichier nécessaire) --- */
+const musicBtn=$('musicBtn');
+const Music=(function(){
+  let ctx=null,master=null,padBus=null,arpBus=null,audio=null,timer=null,nextT=0,bar=0,on=false,started=false;
+  const BAR=6.4, LEVEL=.5;
+  const CH=[
+    {pad:[48,55,59,64],arp:[72,76,79,83,79,76,71,76]},  // Do maj7
+    {pad:[45,52,55,60],arp:[69,72,76,79,76,72,69,72]},  // La m7
+    {pad:[41,48,52,57],arp:[65,69,72,76,72,69,64,69]},  // Fa maj7
+    {pad:[43,50,55,59],arp:[67,71,74,79,74,71,67,71]}   // Sol
+  ];
+  const hz=m=>440*Math.pow(2,(m-69)/12);
+  function setOn(v){
+    on=v; musicBtn.classList.toggle('off',!v); musicBtn.setAttribute('aria-pressed',String(v));
+    musicBtn.setAttribute('aria-label',v?'Couper la musique':'Activer la musique');
+  }
+  function reverb(c){
+    const len=Math.floor(c.sampleRate*3.2), buf=c.createBuffer(2,len,c.sampleRate);
+    for(let ch=0;ch<2;ch++){ const d=buf.getChannelData(ch); for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6); }
+    const cv=c.createConvolver(); cv.buffer=buf; return cv;
+  }
+  function build(){
+    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return false;
+    ctx=new AC();
+    master=ctx.createGain(); master.gain.value=0;
+    const comp=ctx.createDynamicsCompressor(); comp.threshold.value=-24; comp.ratio.value=3;
+    master.connect(comp); comp.connect(ctx.destination);
+    const rv=reverb(ctx), wet=ctx.createGain(); wet.gain.value=.7; rv.connect(wet); wet.connect(master);
+    padBus=ctx.createGain(); const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1600;
+    padBus.connect(lp); lp.connect(master); lp.connect(rv);
+    arpBus=ctx.createGain(); arpBus.connect(master); arpBus.connect(rv);
+    return true;
+  }
+  function tone(type,f,t,dur,peak,att,sus,dest,det){
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type=type; o.frequency.value=f; if(det) o.detune.value=det;
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(peak,t+att);
+    if(sus) g.gain.setValueAtTime(peak,t+sus);
+    g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    o.connect(g); g.connect(dest); o.start(t); o.stop(t+dur+.1);
+  }
+  function scheduleBar(t,i){
+    const c=CH[i%CH.length];
+    c.pad.forEach(m=>{ const f=hz(m+12);
+      tone('sine',f,t,BAR+2.2,.045,1.8,BAR,padBus,0);
+      tone('triangle',f,t,BAR+2.2,.02,1.8,BAR,padBus,7); });
+    c.arp.forEach((m,k)=>{ const f=hz(m), tt=t+k*(BAR/8)+(k%2?.02:0);
+      tone('sine',f,tt,2.6,.07,.012,0,arpBus,0);
+      tone('sine',f*2,tt,1.4,.018,.012,0,arpBus,0); });
+  }
+  function pump(){ while(nextT<ctx.currentTime+2.5){ scheduleBar(nextT,bar++); nextT+=BAR; } }
+  function fade(to,sec){
+    const t=ctx.currentTime; master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(master.gain.value,t); master.gain.linearRampToValueAtTime(to,t+sec);
+  }
+  function fadeAudio(to,ms){
+    const from=audio.volume, t0=performance.now();
+    (function s(n){ const p=Math.min(1,(n-t0)/ms); audio.volume=from+(to-from)*p; if(p<1) requestAnimationFrame(s); })(t0);
+  }
+  async function play(){
+    setOn(true);
+    try{
+      if(MUSIC_URL){
+        if(!audio){ audio=new Audio(MUSIC_URL); audio.loop=true; audio.volume=0; }
+        await audio.play(); fadeAudio(LEVEL,3000);
+      }else{
+        if(!ctx && !build()){ setOn(false); return; }
+        await ctx.resume();
+        if(!timer){ nextT=ctx.currentTime+.15; pump(); timer=setInterval(pump,500); }
+        fade(LEVEL,4);
+      }
+    }catch(e){ setOn(false); }
+  }
+  function pause(){
+    setOn(false);
+    if(audio){ fadeAudio(0,500); setTimeout(()=>{ if(!on) audio.pause(); },550); }
+    else if(ctx){ fade(0,.6); setTimeout(()=>{ if(!on) ctx.suspend(); },700); }
+  }
+  document.addEventListener('visibilitychange',()=>{
+    if(!started) return;
+    if(document.hidden){ if(audio) audio.pause(); else if(ctx) ctx.suspend(); }
+    else if(on){ if(audio) audio.play().catch(()=>{}); else if(ctx) ctx.resume(); }
+  });
+  return {
+    start(){ if(started) return; started=true; play(); },
+    toggle(){ if(on) pause(); else play(); }
+  };
+})();
+musicBtn.addEventListener('click',()=>Music.toggle());
+
 /* --- Ouverture des portes --- */
 const splash=$('splash');
 function openInvite(){
   if(splash.classList.contains('open')) return;
   splash.classList.add('open');
   document.body.classList.add('started');
+  Music.start();
+  musicBtn.classList.add('show');
   setTimeout(()=>document.body.classList.remove('locked'),1200);
   setTimeout(()=>splash.remove(),2100);
 }
