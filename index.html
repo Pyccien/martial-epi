@@ -483,8 +483,7 @@ body.locked{overflow:hidden;height:100vh}
 <script>
 /* ============ À MODIFIER ============ */
 const RSVP_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfbXXrQfulAW-fBgYmtO_jvDhCtU_DG1nH6tJ8dd52ePMuUFw/viewform?usp=publish-editor";   // ex. https://forms.gle/xxxxxxxx
-// Musique : mettez votre fichier mp3 dans le même dossier que ce fichier, nommé exactement musique.mp3.
-// S'il est absent, la musique joyeuse intégrée se lance à la place. Pour un autre nom, changez-le ici ("" = musique intégrée).
+// Musique : mettez votre mp3 dans le même dossier que ce fichier, nommé exactement musique.mp3 (en minuscules).
 const MUSIC_URL = "musique.mp3";
 /* ==================================== */
 
@@ -575,123 +574,48 @@ function tlProgress(){
 }
 addEventListener('scroll',tlProgress,{passive:true}); addEventListener('resize',tlProgress); tlProgress();
 
-/* --- Musique joyeuse (synthétisée, aucun fichier nécessaire) --- */
+/* --- Musique : votre fichier musique.mp3 --- */
 const musicBtn=$('musicBtn');
 const Music=(function(){
-  let useFile=!!MUSIC_URL,ctx=null,master=null,dry=null,rv=null,noise=null,audio=null,timer=null,nextT=0,bar=0,on=false,started=false;
-  const BPM=118, BEAT=60/BPM, BAR=BEAT*4, LEVEL=.55;
-  // Do - Sol - La mineur - Fa : la suite d'accords des chansons joyeuses (8 mesures en boucle)
-  const CH=[
-    {r:36,tri:[60,64,67],mel:[76,79,84,79,76,79,84,-1]},
-    {r:43,tri:[59,62,67],mel:[74,79,83,79,74,79,83,-1]},
-    {r:45,tri:[60,64,69],mel:[76,81,84,81,76,81,84,-1]},
-    {r:41,tri:[60,65,69],mel:[77,81,84,81,84,81,77,-1]},
-    {r:36,tri:[60,64,67],mel:[79,84,88,84,79,-1,84,-1]},
-    {r:43,tri:[59,62,67],mel:[83,79,74,79,83,-1,86,-1]},
-    {r:45,tri:[60,64,69],mel:[84,81,76,81,84,-1,88,-1]},
-    {r:41,tri:[60,65,69],mel:[84,81,77,-1,81,84,89,-1]}
-  ];
-  const hz=m=>440*Math.pow(2,(m-69)/12);
+  let audio=null,on=false,userOff=false,armed=false;
+  const LEVEL=.85;
   function setOn(v){
     on=v; musicBtn.classList.toggle('off',!v); musicBtn.setAttribute('aria-pressed',String(v));
     musicBtn.setAttribute('aria-label',v?'Couper la musique':'Activer la musique');
   }
-  function build(){
-    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return false;
-    ctx=new AC();
-    master=ctx.createGain(); master.gain.value=0;
-    const comp=ctx.createDynamicsCompressor(); comp.threshold.value=-20; comp.ratio.value=4;
-    master.connect(comp); comp.connect(ctx.destination);
-    dry=ctx.createGain(); dry.gain.value=1; dry.connect(master);
-    const len=Math.floor(ctx.sampleRate*1.6), rb=ctx.createBuffer(2,len,ctx.sampleRate);
-    for(let c=0;c<2;c++){ const d=rb.getChannelData(c); for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.4); }
-    rv=ctx.createConvolver(); rv.buffer=rb;
-    const w=ctx.createGain(); w.gain.value=.45; rv.connect(w); w.connect(master);
-    noise=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);
-    const nd=noise.getChannelData(0); for(let i=0;i<nd.length;i++) nd[i]=Math.random()*2-1;
-    return true;
+  function get(){
+    if(!audio){ audio=new Audio(MUSIC_URL); audio.loop=true; audio.preload='auto'; audio.volume=0; }
+    return audio;
   }
-  function env(g,t,peak,att,dec){
-    g.gain.setValueAtTime(.0001,t);
-    g.gain.exponentialRampToValueAtTime(peak,t+att);
-    g.gain.exponentialRampToValueAtTime(.0001,t+att+dec);
+  function fadeTo(to,ms){
+    const a=get(), from=a.volume, t0=performance.now();
+    (function s(n){ const p=Math.min(1,(n-t0)/ms); try{ a.volume=from+(to-from)*p; }catch(e){} if(p<1) requestAnimationFrame(s); })(t0);
   }
-  function voice(type,f,t,peak,att,dec,send,cut){
-    const o=ctx.createOscillator(), g=ctx.createGain(); o.type=type; o.frequency.value=f;
-    let n=o;
-    if(cut){ const fl=ctx.createBiquadFilter(); fl.type='lowpass'; fl.frequency.value=cut; o.connect(fl); n=fl; }
-    env(g,t,peak,att,dec); n.connect(g); g.connect(dry);
-    if(send){ const s=ctx.createGain(); s.gain.value=send; g.connect(s); s.connect(rv); }
-    o.start(t); o.stop(t+att+dec+.05);
+  // Si le navigateur bloque le son au départ, on relance au tout premier geste de l'invité (toucher, défilement, touche)
+  function arm(){
+    if(armed) return; armed=true;
+    const evs=['pointerdown','touchend','click','keydown','wheel','scroll'];
+    const go=()=>{ evs.forEach(e=>window.removeEventListener(e,go,true)); armed=false; if(!userOff && !on) play(); };
+    evs.forEach(e=>window.addEventListener(e,go,true));
   }
-  function kick(t){
-    const o=ctx.createOscillator(), g=ctx.createGain(); o.type='sine';
-    o.frequency.setValueAtTime(130,t); o.frequency.exponentialRampToValueAtTime(42,t+.14);
-    g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.32,t+.005); g.gain.exponentialRampToValueAtTime(.0001,t+.22);
-    o.connect(g); g.connect(dry); o.start(t); o.stop(t+.25);
-  }
-  function hit(t,type,freq,peak,dur){
-    const s=ctx.createBufferSource(), f=ctx.createBiquadFilter(), g=ctx.createGain();
-    s.buffer=noise; f.type=type; f.frequency.value=freq; env(g,t,peak,.003,dur);
-    s.connect(f); f.connect(g); g.connect(dry); s.start(t); s.stop(t+dur+.05);
-  }
-  function scheduleBar(t,i){
-    const c=CH[i%CH.length];
-    // rythme : grosse caisse (1 et 3), claquement léger (2 et 4), charleston sur chaque croche
-    kick(t); kick(t+BEAT*2);
-    hit(t+BEAT,'bandpass',1900,.09,.14); hit(t+BEAT*3,'bandpass',1900,.09,.14);
-    for(let k=0;k<8;k++) hit(t+k*BEAT/2,'highpass',7500,k%2?.05:.032,.05);
-    // basse chantante
-    [[0,c.r],[1.5,c.r],[2,c.r+7],[3.5,c.r+12]].forEach(b=>voice('triangle',hz(b[1]),t+b[0]*BEAT,.3,.01,.32,0,900));
-    // accords sautillants sur les contretemps
-    for(let k=0;k<4;k++) c.tri.forEach(m=>voice('triangle',hz(m),t+BEAT*(k+.5),.022,.004,.16,.15,2600));
-    // mélodie entraînante
-    c.mel.forEach((m,k)=>{ if(m<0) return; const tt=t+k*BEAT/2;
-      voice('triangle',hz(m),tt,.085,.005,.38,.35,4200);
-      voice('sine',hz(m)*2,tt,.02,.004,.25,.35,0); });
-    // petite clochette de fête à chaque mesure
-    voice('sine',hz(c.tri[2]+24),t,.03,.003,1.4,.6,0);
-  }
-  function pump(){ while(nextT<ctx.currentTime+2.5){ scheduleBar(nextT,bar++); nextT+=BAR; } }
-  function fade(to,sec){
-    const t=ctx.currentTime; master.gain.cancelScheduledValues(t);
-    master.gain.setValueAtTime(master.gain.value,t); master.gain.linearRampToValueAtTime(to,t+sec);
-  }
-  function fadeAudio(to,ms){
-    const from=audio.volume, t0=performance.now();
-    (function s(n){ const p=Math.min(1,(n-t0)/ms); audio.volume=from+(to-from)*p; if(p<1) requestAnimationFrame(s); })(t0);
-  }
-  async function play(){
+  function play(){
     setOn(true);
-    try{
-      if(useFile){
-        if(!audio){ audio=new Audio(MUSIC_URL); audio.loop=true; audio.volume=0;
-          audio.addEventListener('error',()=>{ if(!useFile) return; useFile=false; audio=null; if(on) play(); }); }
-        await audio.play(); fadeAudio(LEVEL,3000);
-      }else{
-        if(!ctx && !build()){ setOn(false); return; }
-        await ctx.resume();
-        if(!timer){ nextT=ctx.currentTime+.15; pump(); timer=setInterval(pump,500); }
-        fade(LEVEL,2);
-      }
-    }catch(e){
-      if(useFile && e && e.name==='NotSupportedError'){ useFile=false; audio=null; return play(); }
-      setOn(false);
-    }
+    const a=get(), pr=a.play();
+    if(pr && pr.then) pr.then(()=>fadeTo(LEVEL,2500)).catch(()=>{ setOn(false); arm(); });
   }
   function pause(){
-    setOn(false);
-    if(audio){ fadeAudio(0,500); setTimeout(()=>{ if(!on) audio.pause(); },550); }
-    else if(ctx){ fade(0,.6); setTimeout(()=>{ if(!on) ctx.suspend(); },700); }
+    userOff=true; setOn(false);
+    if(audio){ fadeTo(0,400); setTimeout(()=>{ if(!on) audio.pause(); },450); }
   }
   document.addEventListener('visibilitychange',()=>{
-    if(!started) return;
-    if(document.hidden){ if(audio) audio.pause(); else if(ctx) ctx.suspend(); }
-    else if(on){ if(audio) audio.play().catch(()=>{}); else if(ctx) ctx.resume(); }
+    if(!audio) return;
+    if(document.hidden) audio.pause();
+    else if(on) audio.play().catch(()=>{});
   });
+  get();
   return {
-    start(){ if(started) return; started=true; play(); },
-    toggle(){ if(on) pause(); else play(); }
+    start(){ if(userOff||on) return; play(); },
+    toggle(){ if(on) pause(); else { userOff=false; play(); } }
   };
 })();
 musicBtn.addEventListener('click',()=>Music.toggle());
